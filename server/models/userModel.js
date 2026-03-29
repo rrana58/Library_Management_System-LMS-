@@ -27,18 +27,18 @@ const userSchema = new mongoose.Schema({
     accountVerified: { type: Boolean, default: false },
     borrowedBooks:[
         {
-            bookId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Borrow"
-            },
-            returned:{
-                type: Boolean,
-                default: false,
-            },
-            bookTitle: String,
-            borrowDate: Date,
-            dueDate: Date,
+            book: { 
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Book"
         },
+        returned: {
+            type: Boolean,
+            default: false,
+        },
+        bookTitle: String,
+        borrowDate: Date,
+        dueDate: Date,
+    },
     ],
     avatar: {
         public_id: String,
@@ -53,7 +53,6 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 }
 );
-
 
 userSchema.methods.generateVerificationCode = function() {
     function generateRandomFiveDigitNumber(){
@@ -87,9 +86,5 @@ userSchema.methods.getResetPasswordToken = function() {
     return resetToken;
 };
 
-
-export const User = mongoose.model("User", userSchema);
-
-
-
-
+const User = mongoose.model("User", userSchema);
+export default User; 
