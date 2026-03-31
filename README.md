@@ -1,39 +1,37 @@
-# Library Management System (LMS)
+# Library Management System (LMS) - Backend
 
-A full-stack backend application for managing library operations, built with Node.js, Express, and MongoDB.
+A robust, full-stack backend application designed to streamline library operations, automate member notifications, and manage book inventories. Built with **Node.js**, **Express**, and **MongoDB**.
 
-## Features Completed
+## Key Features
 
 ### Authentication & Security
-- **User Registration & Login**: Secure entry for users and librarians.
-- **JWT Authentication**: Protected routes using JSON Web Tokens.
-- **Role-Based Authorization**: Separate permissions for Admins and regular Users.
-- **Password Management**: Secure password hashing using Bcrypt.
+- **Secure Registration**: Multi-step registration with OTP verification.
+- **JWT Authorization**: Role-based access control (Admin vs. User) using JSON Web Tokens.
+- **Data Protection**: Industry-standard password hashing using **Bcrypt**.
 
-### User Management (New ✨)
-- **Admin Management**: Capability to register new Admin accounts.
-- **User Directory**: Implementation of `getAllUsers` to retrieve all registered members.
-- **Media Uploads**: Integrated Cloudinary for handling profile pictures.
+### Book & Inventory Management
+- **Full CRUD**: Admins can add, update, and delete books from the catalog.
+- **Real-time Availability**: Automatic tracking of book quantities and availability status.
 
-### Book Management
-- **Full CRUD Operations**: Create, Read, Update, and Delete books.
-- **Database Integration**: Scalable MongoDB schemas for books and users.
+### Borrowing & Fine System
+- **Borrowing Workflow**: Users can borrow books; the system records due dates and borrower details.
+- **Smart Returns**: Automatic stock updates upon book return.
+- **Fine Calculator**: Integrated utility to calculate hourly fines for overdue books.
 
-### Borrowing & Fines 
-- **Borrow Record**: Track which user has which book.
-- **Return Logic**: Update book availability automatically upon return.
-- **Fine Calculation**: Automated utility to calculate fines if the due date is exceeded.
+### Automation (Background Tasks)
+- **Overdue Notifications**: A cron job runs every 30 minutes to identify overdue books and send automated email reminders to users.
+- **Database Cleanup**: An automated service runs every 5 minutes to remove unverified accounts that have expired, keeping the database optimized.
+
+---
 
 ## Tech Stack
-- **Node.js & Express** (Backend Framework)
-- **MongoDB & Mongoose** (Database & Modeling)
-- **Cloudinary** (Media Management & Storage)
-- **Bcrypt** (Password Encryption)
-- **JWT** (Security Tokens)
-- **Dotenv** (Environment Configuration)
 
-## Project Structure
-- `server/controllers`: Logic for Auth, Books, Borrowing, and **User Management**.
-- `server/models`: Database Schemas.
-- `server/routes`: API Endpoints.
-- `server/utils`: Utility functions like the Fine Calculator.
+- **Server**: Node.js, Express.js
+- **Database**: MongoDB with Mongoose ODM
+- **Automation**: Node-cron (Scheduled Tasks)
+- **Media**: Cloudinary (Admin/User Avatars)
+- **Email**: Nodemailer (SMTP Integration)
+- **Security**: JWT, Bcrypt, Cookie-parser
+
+---
+

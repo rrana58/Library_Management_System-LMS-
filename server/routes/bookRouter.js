@@ -1,5 +1,5 @@
 import express from "express";
-import { isAuthenticated, isAuthorized } from "../middlewares/authMiddleware.js"; // FIX: Spelled correctly
+import { isAuthenticated, isAuthorized } from "../middlewares/authMiddleware.js"; 
 import { addBook, deleteBook, getAllBooks } from "../controllers/bookController.js";
 
 const router = express.Router();

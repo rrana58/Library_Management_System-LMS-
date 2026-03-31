@@ -1,7 +1,7 @@
 import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";  
 import { ErrorHandler } from "../middlewares/errorMiddlewares.js";
-import Book from "../models/bookModel.js"; // FIX: No curly braces
-import User from "../models/userModel.js"; // FIX: No curly braces
+import Book from "../models/bookModel.js"; 
+import User from "../models/userModel.js"; 
 
 export const addBook = catchAsyncErrors(async (req, res, next) => {
     const { title, author, description, price, quantity } = req.body;

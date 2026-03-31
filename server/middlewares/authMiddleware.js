@@ -1,7 +1,7 @@
 import { catchAsyncErrors } from "./catchAsyncErrors.js";
 import { ErrorHandler } from "./errorMiddlewares.js"; 
 import jwt from "jsonwebtoken";
-import User from "../models/userModel.js"; // FIX: Removed curly braces
+import User from "../models/userModel.js"; 
 
 export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
     const { token } = req.cookies;
@@ -13,7 +13,7 @@ export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
     next();
 });
 
-// FIX: Corrected spelling from isAutherorized to isAuthorized
+
 export const isAuthorized = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {

@@ -12,23 +12,23 @@ import crypto from "crypto";
 export const register = catchAsyncErrors(async (req, res, next) => {
     const { name, email, password } = req.body;
 
-    // 1. Basic Field Validation
+    
     if (!name || !email || !password) {
         return next(new ErrorHandler("Please enter all fields.", 400));
     }
 
-    // 2. Password Length Validation
+   
     if (password.length < 8 || password.length > 16) {
         return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
     }
 
-    // 3. Check if a VERIFIED user already exists
+    
     const existingVerifiedUser = await User.findOne({ email, accountVerified: true });
     if (existingVerifiedUser) {
         return next(new ErrorHandler("User already registered with this email. Please login.", 400));
     }
 
-    // 4. Rate Limiting: Check for existing UNVERIFIED registration attempts
+    
     const registrationAttemptsByUser = await User.find({
         email,
         accountVerified: false,
@@ -38,31 +38,25 @@ export const register = catchAsyncErrors(async (req, res, next) => {
         return next(new ErrorHandler("Too many registration attempts. Please contact support.", 400));
     }
 
-    /** 
-     * 5. Cleanup: Delete existing unverified records for this email.
-     * This prevents "Unique Email" index errors and allows the user 
-     * to 'retry' registration if they didn't receive their previous OTP.
-     */
+   
     await User.deleteOne({ email, accountVerified: false });
 
-    // 6. Security: Hash the password
+   
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 7. Create New User Instance
+    
     const newUser = new User({
         name,
         email,
         password: hashedPassword,
     });
 
-    // 8. Generate OTP/Code (Assuming this method is defined in your User Schema)
+    
     const verificationCode = newUser.generateVerificationCode(); 
     
-    // 9. Save to Database
     await newUser.save();
 
-    // 10. Send Verification Email and Respond to Client
-    // We await this to ensure the email is sent (or fails) before finishing the request
+    
     await sendVerificationCode(verificationCode, email, res);
 });
 

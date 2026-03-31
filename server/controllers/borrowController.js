@@ -5,16 +5,16 @@ import Borrow from "../models/borrowModel.js";
 import User from "../models/userModel.js";
 import { calculateFine } from "../utils/fineCalculator.js";
 
-// 1. Get borrowed books of the logged-in user
+
 export const borrowedBooks = catchAsyncErrors(async (req, res, next) => {
     const { borrowedBooks } = req.user;
     res.status(200).json({
         success: true,
         borrowedBooks,
     });
-}); // FIXED: Added missing closing brackets here
+}); 
 
-// 2. Record a borrowed book
+
 export const recordBorrowedBook = catchAsyncErrors(async (req, res, next) => {
     const { id } = req.params;
     const email = req.body.email || req.user.email;
@@ -27,7 +27,7 @@ export const recordBorrowedBook = catchAsyncErrors(async (req, res, next) => {
 
     if (book.quantity === 0) return next(new ErrorHandler("Book not available.", 400));
 
-    // DATABASE MATCH: Looking for 'book' field (matching your MongoDB screenshot)
+    
     const isAlreadyBorrowed = user.borrowedBooks.find(
         (b) => b.book?.toString() === id && b.returned === false
     );
@@ -59,16 +59,16 @@ export const recordBorrowedBook = catchAsyncErrors(async (req, res, next) => {
     });
 });
 
-// 3. Get all borrowed records (Admin Only)
+
 export const getBorrowedBooksForAdmin = catchAsyncErrors(async (req, res, next) => {
     const borrowedRecords = await Borrow.find().populate("book", "title");
     res.status(200).json({
          success: true, 
          borrowedRecords,
     });
-}); // FIXED: Balanced brackets here
+}); 
 
-// 4. Return a borrowed book
+
 export const returnBorrowBook = catchAsyncErrors(async (req, res, next) => {
     const { bookId } = req.params;
     const { email } = req.body;
@@ -79,7 +79,7 @@ export const returnBorrowBook = catchAsyncErrors(async (req, res, next) => {
     const user = await User.findOne({ email });
     if (!user) return next(new ErrorHandler("User not found.", 404));
 
-    // DATABASE MATCH: Matches 'book' field from your MongoDB screenshot
+    
     const borrowedBook = user.borrowedBooks.find(
         (b) => b.book?.toString() === bookId && b.returned === false
     );
