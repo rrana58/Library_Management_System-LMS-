@@ -1,0 +1,90 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import toast from 'react-hot-toast';
+import { motion } from 'motion/react';
+import { Mail, Loader2, Book, ArrowLeft } from 'lucide-react';
+
+const ForgotPassword: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await api.post('/auth/password/forgot', { email });
+      if (data.success) {
+        toast.success('Recovery OTP sent to your email!');
+        navigate('/password/reset', { state: { email } });
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to send reset link');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-12 sm:px-6 lg:px-8 transition-colors">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md w-full space-y-8 bg-white dark:bg-gray-900 p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800"
+      >
+        <div>
+          <div className="flex justify-center">
+            <div className="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-200 dark:shadow-none">
+              <Book className="h-10 w-10 text-white" />
+            </div>
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+            Forgot Password
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
+        </div>
+
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="email"
+                required
+                className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all shadow-lg shadow-blue-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Send Recovery OTP'}
+            </button>
+          </div>
+
+          <div className="text-center">
+            <Link to="/login" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Login
+            </Link>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+export default ForgotPassword;
