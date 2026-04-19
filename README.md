@@ -1,6 +1,6 @@
-# Library Management System (LMS) - Backend
+# Library Management System (LMS)
 
-A robust, full-stack backend application designed to streamline library operations, automate member notifications, and manage book inventories. Built with **Node.js**, **Express**, and **MongoDB**.
+A robust, full-stack application designed to streamline library operations, automate member notifications, and manage book inventories. Built with **Node.js**, **Express**, and **MongoDB**.
 
 ## Key Features
 
@@ -18,7 +18,8 @@ A robust, full-stack backend application designed to streamline library operatio
 - **Smart Returns**: Automatic stock updates upon book return.
 - **Fine Calculator**: Integrated utility to calculate hourly fines for overdue books.
 
-### Automation (Background Tasks)
+### Automation & AI (Background Tasks & Chatbot)
+- **AI Library Assistant**: Integrated Gemini AI chatbot to help users with book recommendations, library hours, and policy queries.
 - **Overdue Notifications**: A cron job runs every 30 minutes to identify overdue books and send automated email reminders to users.
 - **Database Cleanup**: An automated service runs every 5 minutes to remove unverified accounts that have expired, keeping the database optimized.
 
