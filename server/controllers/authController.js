@@ -7,6 +7,7 @@ import { sendToken } from "../utils/sendToken.js";
 import { generateForgotPasswordEmailTemplate } from "../utils/emailTemplates.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import crypto from "crypto";
+import { createNotification } from "./notificationController.js";
 
 
 export const register = catchAsyncErrors(async (req, res, next) => {
@@ -23,7 +24,11 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     }
 
     
-    const existingVerifiedUser = await User.findOne({ email, accountVerified: true });
+    const existingVerifiedUser = await User.findOne({ 
+        email, 
+        accountVerified: true,
+        isPermanentDeleted: false 
+    });
     if (existingVerifiedUser) {
         return next(new ErrorHandler("User already registered with this email. Please login.", 400));
     }
@@ -108,7 +113,7 @@ export const verifyOTP = catchAsyncErrors(async (req, res, next) => {
         user.verificationCodeExpire = null;
         await user.save({validateModifiedOnly: true});
 
-
+        await createNotification(user._id, "Welcome to the Library! Your account is now verified.", "General");
 
         sendToken(user, 200, res, "Account verified successfully.");
 
@@ -124,34 +129,45 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     if (!email || !password) {
         return next(new ErrorHandler("Please enter all fields.", 400));
     }
-    const user = await User.findOne({ email, accountVerified: true }).select(
+    console.log(`Login attempt for email: ${email}`);
+    const user = await User.findOne({ email, accountVerified: true, isPermanentDeleted: false }).select(
         "+password"
     );
+    console.log(`User found in DB: ${user ? "Yes" : "No"}`);
+    if (user) console.log(`Account status: Verified=${user.accountVerified}, Deleted=${user.isPermanentDeleted}`);
+
     if (!user) {
-        return next(new ErrorHandler("Invalid email or password.", 400));
+        return next(new ErrorHandler("Account not found or permanently deleted.", 401));
     }
     const isPasswordMatched = await bcrypt.compare(password, user.password);
     if (!isPasswordMatched) {
         return next(new ErrorHandler("Invalid email or password.", 400));
     }
+    
+    if (user.scheduledForDeletion) {
+        user.scheduledForDeletion = undefined;
+        await user.save();
+    }
+
     sendToken(user, 200, res, "Login successful.");
 
  });
 
 
- export const logout = catchAsyncErrors(async (req, res, next) => { 
-    res
-    .status(200)
-    .cookie("token", "",{
+export const logout = catchAsyncErrors(async (req, res, next) => { 
+    res.status(200)
+    .cookie("token", "", {
         expires: new Date(Date.now()),
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
+        path: "/"
     })
     .json({
         success: true,
         message: "Logged out successfully.",
     });
-
- });
+});
 
 
  export const getUser = catchAsyncErrors(async (req, res, next) => {
@@ -170,39 +186,54 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
         return next(new ErrorHandler("Please provide your email.", 400));
     }  
 
+    console.log(`Forgot password attempt for email: ${email}`);
     const user = await User.findOne({
-         email: req.body.email, 
+         email: email, 
          accountVerified: true 
     });
+    console.log(`User found for forgot password: ${user ? "Yes" : "No"}`);
 
     if (!user) {
         return next(new ErrorHandler("Invalid email.", 400));
     }
 
-    const resetToken = user.getResetPasswordToken();
-
-
+    const otp = user.generateResetPasswordOTP();
     await user.save({ validateBeforeSave: false});
 
-    const resetPasswordUrl = `${process.env.FRONTEND_URL}/password/reset/${resetToken}`;
+    const message = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #000; color: #fff;">
+            <h2 style="color: #fff; text-align: center;">Reset Your Password</h2>
+            <p style="font-size: 16px; color: #ccc;">Dear User,</p>
+            <p style="font-size: 16px; color: #ccc;">You requested to reset your password. Please use the following OTP (One-Time Password) to proceed:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <span style="display: inline-block; font-size: 32px; font-weight: bold; color: #000; padding: 15px 30px; background-color: #f1c40f; border-radius: 10px; letter-spacing: 5px;">
+                    ${otp}
+                </span>
+            </div>
 
-    const message = generateForgotPasswordEmailTemplate(resetPasswordUrl);
-
+            <p style="font-size: 16px; color: #ccc;">This code is valid for 15 minutes. If you did not request this, please ignore this email.</p>
+            
+            <footer style="margin-top: 20px; text-align: center; font-size: 14px; color: #666; border-top: 1px solid #444; padding-top: 10px;">
+                <p>Thank you,<br>Library Management Team</p>
+            </footer>
+        </div>
+    `;
 
     try {
         await sendEmail({
             email: user.email,
-            subject: "My Library Password Recovery",
+            subject: "Password Recovery OTP",
             message,
         });
         res.status(200).json({
             success: true,
-            message: `Email sent to ${user.email} successfully.`,
+            message: `OTP sent to ${user.email} successfully.`,
         });
 
     } catch (error) {
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpire = undefined;
+        user.resetPasswordOTP = undefined;
+        user.resetPasswordOTPExpire = undefined;
         await user.save({ validateBeforeSave: false});
         return next(new ErrorHandler(error.message, 500));
     }
@@ -212,18 +243,20 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
 
 
 export const resetPassword = catchAsyncErrors(async (req, res, next) => {
-    const { token } = req.params;
-    const { password, confirmPassword } = req.body || {};
+    const { email, otp, password, confirmPassword } = req.body || {};
 
-    const resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
+    if (!email || !otp || !password || !confirmPassword) {
+        return next(new ErrorHandler("Please provide all fields.", 400));
+    }
 
     const user = await User.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() },
+        email,
+        resetPasswordOTP: otp,
+        resetPasswordOTPExpire: { $gt: Date.now() },
     });
 
     if (!user) {
-        return next(new ErrorHandler("Invalid or expired password reset token.", 400));
+        return next(new ErrorHandler("Invalid or expired OTP.", 400));
     }
 
     if (password !== confirmPassword) {
@@ -236,10 +269,12 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     user.password = hashedPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpire = undefined;
 
     await user.save();
+
+    await createNotification(user._id, "Your password was successfully reset via the recovery link.", "General");
 
     sendToken(user, 200, res, "Password reset successful.");
 });
@@ -271,6 +306,8 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
     await user.save();
+
+    await createNotification(user._id, "Your password was recently updated.", "General");
 
     res.status(200).json({
         success: true,
