@@ -1,0 +1,5 @@
+{
+  "name": "My Library",
+  "description": "A comprehensive Library Management System for managing books, borrowings, and reservations with integrated AI chatbot and payments.",
+  "requestFramePermissions": []
+}

@@ -15,6 +15,11 @@ const bookSchema = new mongoose.Schema({
     type: String,
     required: true, 
   },
+  category: {
+    type: String,
+    required: true,
+    default: "Uncategorized"
+  },
   price:{
     type: Number,
     required: true,

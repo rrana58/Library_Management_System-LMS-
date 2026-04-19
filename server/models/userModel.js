@@ -40,6 +40,12 @@ const userSchema = new mongoose.Schema({
         dueDate: Date,
     },
     ],
+    savedBooks: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Book"
+        }
+    ],
     avatar: {
         public_id: String,
         url: String,
@@ -48,6 +54,14 @@ const userSchema = new mongoose.Schema({
     verificationCodeExpire: Date,
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    resetPasswordOTP: Number,
+    resetPasswordOTPExpire: Date,
+    scheduledForDeletion: Date,
+    deletionRequestedAt: Date,
+    isPermanentDeleted: {
+        type: Boolean,
+        default: false
+    },
 }, 
 {
   timestamps: true
@@ -65,6 +79,18 @@ userSchema.methods.generateVerificationCode = function() {
     this.verificationCode = verificationCode;
     this.verificationCodeExpire = Date.now() + 15 * 60 * 1000;
     return verificationCode;
+};
+
+userSchema.methods.generateResetPasswordOTP = function() {
+    function generateRandomFiveDigitNumber(){
+        const firstDigit = Math.floor(Math.random() * 9) + 1;
+        const remainingDigits = Math.floor(Math.random() * 10000).toString().padStart(4,0);
+        return parseInt(firstDigit + remainingDigits);
+    }
+    const otp = generateRandomFiveDigitNumber();
+    this.resetPasswordOTP = otp;
+    this.resetPasswordOTPExpire = Date.now() + 15 * 60 * 1000;
+    return otp;
 };
 
 userSchema.methods.generateToken = function() {

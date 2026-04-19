@@ -13,6 +13,9 @@ const borrowSchema = new mongoose.Schema({
     returnDate: { type: Date, default: null },
     fine: { type: Number, default: 0 },
     notified: { type: Boolean, default: false },
+    reservationStatus: { type: String, enum: ["Reserved", "Borrowed", "PendingReturn", "Cancelled", "Returned"], default: "Borrowed" },
+    paymentMethod: { type: String, enum: ["Cash", "Khalti", "None"], default: "None" },
+    reservationExpiry: { type: Date, default: null },
 }, { timestamps: true });
 
 

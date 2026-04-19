@@ -30,7 +30,7 @@ A robust, full-stack application designed to streamline library operations, auto
 - **Server**: Node.js, Express.js
 - **Database**: MongoDB with Mongoose ODM
 - **Automation**: Node-cron (Scheduled Tasks)
-- **Media**: Cloudinary (Admin/User Avatars)
+- **Media**: Cloudinary (Admin Avatars)
 - **Email**: Nodemailer (SMTP Integration)
 - **Security**: JWT, Bcrypt, Cookie-parser
 
