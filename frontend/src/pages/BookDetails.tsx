@@ -21,15 +21,17 @@ const BookDetails: React.FC = () => {
   const { id } = useParams();
   const [book, setBook] = useState<Book | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [activeReservationId, setActiveReservationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const fetchBook = async () => {
     try {
-      const [bookRes, userRes] = await Promise.all([
+      const [bookRes, userRes, borrowRes] = await Promise.all([
         api.get(`/book/details/${id}`),
-        user ? api.get('/user/saved-books') : Promise.resolve({ data: { success: false, savedBooks: [] } })
+        user ? api.get('/user/saved-books') : Promise.resolve({ data: { success: false, savedBooks: [] } }),
+        user ? api.get('/borrow/my-borrowed-books') : Promise.resolve({ data: { success: false, borrowedBooks: [] } })
       ]);
       
       if (bookRes.data.success) {
@@ -37,6 +39,12 @@ const BookDetails: React.FC = () => {
       }
       if (userRes.data.success) {
         setIsSaved(userRes.data.savedBooks.some((b: any) => b._id === id));
+      }
+      if (borrowRes.data.success) {
+        const activeRes = borrowRes.data.borrowedBooks.find(
+          (b: any) => (b.book._id === id || b.book === id || b.bookTitle === bookRes.data.book?.title) && b.reservationStatus === 'Reserved'
+        );
+        setActiveReservationId(activeRes ? activeRes._id : null);
       }
     } catch (error) {
       toast.error('Failed to fetch data');
@@ -73,6 +81,20 @@ const BookDetails: React.FC = () => {
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Reservation failed');
+    }
+  };
+
+  const handleCancelReservation = async () => {
+    if (!activeReservationId) return;
+    try {
+      const { data } = await api.put(`/borrow/unreserve/${activeReservationId}`);
+      if (data.success) {
+        toast.success(data.message);
+        setActiveReservationId(null);
+        fetchBook();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to cancel reservation');
     }
   };
 
@@ -149,7 +171,9 @@ const BookDetails: React.FC = () => {
                   <ShieldCheck className="w-3 h-3 mr-1" />
                   Status
                 </div>
-                <div className="text-xl font-bold text-gray-900 dark:text-white">{book.availability ? 'Ready to Borrow' : 'Reserved'}</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white">
+                  {activeReservationId ? 'Reserved by You' : (book.availability ? 'Ready to Borrow' : 'Out of Stock')}
+                </div>
               </div>
             </div>
 
@@ -167,13 +191,22 @@ const BookDetails: React.FC = () => {
                   <Zap className="w-5 h-5 mr-2" />
                   {isSaved ? "Already Saved" : "Save for Later"}
                 </button>
-                <button
-                  onClick={handleReserve}
-                  disabled={!book.availability}
-                  className="flex-1 flex items-center justify-center px-8 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Reserve for 24h
-                </button>
+                {activeReservationId ? (
+                  <button
+                    onClick={handleCancelReservation}
+                    className="flex-1 flex items-center justify-center px-8 py-4 border-2 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-bold rounded-2xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all shadow-sm"
+                  >
+                    Cancel Reservation
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleReserve}
+                    disabled={!book.availability}
+                    className="flex-1 flex items-center justify-center px-8 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Reserve for 24h
+                  </button>
+                )}
               </div>
             )}
           </div>

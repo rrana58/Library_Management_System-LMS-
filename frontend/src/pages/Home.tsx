@@ -78,7 +78,7 @@ const Home: React.FC = () => {
               { title: 'Save for Later', icon: BookOpen, desc: 'Keep track of books you want to read next without any hassle.' },
               { title: 'Smart Reservations', icon: Zap, desc: 'Reserve books for 24 hours and collect them at your convenience.' },
               { title: 'AI Assistant', icon: Search, desc: 'Get instant answers about library hours, fines, and availability.' },
-              { title: 'Secure Payments', icon: Shield, desc: 'Pay your late fines securely using Khalti integration.' },
+              { title: 'Secure Payments', icon: Shield, desc: 'Pay your late fines securely using Stripe integration.' },
             ].map((feature, idx) => (
               <motion.div
                 key={idx}

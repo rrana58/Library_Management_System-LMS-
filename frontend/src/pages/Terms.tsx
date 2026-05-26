@@ -1,18 +1,20 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Shield, Scale, FileText, Lock, ArrowLeft } from 'lucide-react';
 
 const Terms: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
-      <Link 
-        to="/" 
+      <button 
+        onClick={() => navigate(-1)}
         className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-blue-600 mb-8 transition-colors group"
       >
         <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-        Back to Home
-      </Link>
+        Go Back
+      </button>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -59,7 +61,7 @@ const Terms: React.FC = () => {
           <section>
             <h2 className="text-xl font-bold">4. Late Fines and Payments</h2>
             <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-              Late fines are calculated automatically based on the due date. Payments can be made securely through our integrated payment gateways (e.g., Khalti). Failure to return books on time may result in temporary suspension of borrowing privileges.
+              Late fines are calculated automatically based on the due date. Payments can be made securely through our integrated online payment gateways (e.g., Stripe). Failure to return books on time may result in temporary suspension of borrowing privileges.
             </p>
           </section>
 

@@ -1,18 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Bell, MessageSquare, Library, Sun, Moon, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, BellRing, MessageSquare, Library, Sun, Moon, Settings as SettingsIcon } from 'lucide-react';
 import logo from '../assets/logo.png';
+import api from '../services/api';
 
 const Navbar: React.FC = () => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const [hasUnread, setHasUnread] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/admin/dashboard';
   const dashboardPath = user?.role === 'Admin' ? '/admin/dashboard' : '/dashboard';
+
+  useEffect(() => {
+    if (user) {
+      const fetchNotifications = async () => {
+        try {
+          const { data } = await api.get('/notification/me');
+          if (data.success) {
+            const unread = data.notifications.some((n: any) => !n.isRead);
+            setHasUnread(unread);
+          }
+        } catch (error) {
+          console.error('Failed to fetch notifications');
+        }
+      };
+      fetchNotifications();
+    }
+  }, [user, location.pathname]);
 
   return (
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-50 transition-colors">
@@ -54,8 +73,14 @@ const Navbar: React.FC = () => {
             {user ? (
               <>
                 <Link to="/notifications" className={`p-2 transition-colors relative ${isActive('/notifications') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-blue-600'}`}>
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900"></span>
+                  {hasUnread ? (
+                    <>
+                      <BellRing className="h-5 w-5 text-red-500" />
+                      <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900 animate-pulse"></span>
+                    </>
+                  ) : (
+                    <Bell className="h-5 w-5" />
+                  )}
                 </Link>
 
                 <Link to="/settings" className={`p-2 transition-colors ${isActive('/settings') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-blue-600'}`} aria-label="Settings">

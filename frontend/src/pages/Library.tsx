@@ -156,12 +156,12 @@ const Library: React.FC = () => {
                   className="mt-4 inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest transition-all"
                 >
                   {expandedBookId === book._id ? 'Hide Details' : 'View Details'}
-                  <ArrowRight className={cn("w-3 h-3 ml-1 transition-transform", expandedBookId === book._id ? "rotate-90" : "")} />
+                  <ArrowRight className={cn("w-3 h-3 ml-1 transition-transform", expandedBookId === book._id ? "-rotate-90" : "")} />
                 </button>
                 
                 <div className="mt-6 flex items-center justify-between">
                   <div className="flex items-center text-gray-900 dark:text-white font-bold">
-                    <span className="mr-1 text-sm font-bold text-green-600">NRP</span>
+                    <span className="mr-1 text-sm font-bold text-green-600">$</span>
                     {book.price.toFixed(2)}
                   </div>
                   <div className="flex items-center text-gray-500 dark:text-gray-400 text-sm">

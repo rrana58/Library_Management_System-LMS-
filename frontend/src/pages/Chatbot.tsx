@@ -43,8 +43,9 @@ const Chatbot: React.FC = () => {
         setMessages(prev => [...prev, { role: 'bot', text: data.reply }]);
       }
     } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Sorry, I encountered an error. Please try again later.';
       toast.error('Chatbot error');
-      setMessages(prev => [...prev, { role: 'bot', text: 'Sorry, I encountered an error. Please try again later.' }]);
+      setMessages(prev => [...prev, { role: 'bot', text: errorMessage }]);
     } finally {
       setLoading(false);
     }

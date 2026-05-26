@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { motion } from 'motion/react';
 import { Plus, BookOpen, CheckCircle, Loader2, X, TrendingUp, Users, ShieldAlert, Edit, Trash2, Library, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
+import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface BorrowRecord {
   _id: string;
@@ -28,6 +28,18 @@ interface UserRecord {
   };
 }
 
+interface TransactionRecord {
+  _id: string;
+  user: { name: string; email: string };
+  bookTitle: string;
+  bookPrice: number;
+  fineAmount: number;
+  totalAmount: number;
+  paymentMethod: string;
+  paymentType: string;
+  date: string;
+}
+
 interface Book {
   _id: string;
   title: string;
@@ -42,7 +54,57 @@ const AdminDashboard: React.FC = () => {
   const [borrowedRecords, setBorrowedRecords] = useState<BorrowRecord[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
-  const [activeTab, setActiveTab] = useState<'records' | 'users' | 'inventory' | 'deletions'>('records');
+  const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [transactionStats, setTransactionStats] = useState<any[]>([]);
+  const [transactionFilter, setTransactionFilter] = useState<'All' | 'Today' | 'Weekly' | 'Monthly' | 'Annually' | 'Custom'>('All');
+  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+  const [activeTab, setActiveTab] = useState<'records' | 'users' | 'inventory' | 'deletions' | 'transactions'>('records');
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(tx => {
+      const txDate = new Date(tx.date);
+      const now = new Date();
+      
+      if (transactionFilter === 'All') return true;
+      if (transactionFilter === 'Today') {
+        return txDate.toDateString() === now.toDateString();
+      }
+      if (transactionFilter === 'Weekly') {
+        const past7Days = new Date();
+        past7Days.setDate(now.getDate() - 7);
+        return txDate >= past7Days && txDate <= now;
+      }
+      if (transactionFilter === 'Monthly') {
+        return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+      }
+      if (transactionFilter === 'Annually') {
+        return txDate.getFullYear() === now.getFullYear();
+      }
+      if (transactionFilter === 'Custom') {
+        if (!customDateRange.start || !customDateRange.end) return true;
+        const startDate = new Date(customDateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(customDateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return txDate >= startDate && txDate <= endDate;
+      }
+      return true;
+    });
+  }, [transactions, transactionFilter, customDateRange]);
+
+  const { totalRevenue, totalStripe, totalCash } = useMemo(() => {
+    let totalRevenue = 0;
+    let totalStripe = 0;
+    let totalCash = 0;
+    
+    filteredTransactions.forEach(tx => {
+      totalRevenue += tx.totalAmount;
+      if (tx.paymentMethod === 'Stripe') totalStripe += tx.totalAmount;
+      if (tx.paymentMethod === 'Cash') totalCash += tx.totalAmount;
+    });
+    
+    return { totalRevenue, totalStripe, totalCash };
+  }, [filteredTransactions]);
   const [loading, setLoading] = useState(true);
   const [showAddBook, setShowAddBook] = useState(false);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
@@ -50,6 +112,8 @@ const AdminDashboard: React.FC = () => {
   const [newBook, setNewBook] = useState({ title: '', author: '', description: '', price: 0, quantity: 0, category: 'Fiction' });
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '', avatar: null as File | null });
   const [userRoleFilter, setUserRoleFilter] = useState<'All' | 'Admin' | 'User'>('All');
+  const [recordFilter, setRecordFilter] = useState<'All' | 'On-Time' | 'Overdue'>('All');
+  const [recordSearch, setRecordSearch] = useState('');
 
   const [categoryData, setCategoryData] = useState<{ name: string, value: number }[]>([]);
   const [totalBorrowed, setTotalBorrowed] = useState(0);
@@ -60,11 +124,12 @@ const AdminDashboard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [recordsRes, usersRes, statsRes, booksRes] = await Promise.all([
+      const [recordsRes, usersRes, statsRes, booksRes, transRes] = await Promise.all([
         api.get('/borrow/borrowed-books-by-users'),
         api.get('/user/admin/all-users'),
         api.get('/borrow/admin/stats'),
-        api.get('/book/all')
+        api.get('/book/all'),
+        api.get('/transaction/all')
       ]);
 
       if (recordsRes.data.success) {
@@ -80,6 +145,10 @@ const AdminDashboard: React.FC = () => {
       }
       if (booksRes.data.success) {
         setBooks(booksRes.data.books);
+      }
+      if (transRes.data.success) {
+        setTransactions(transRes.data.transactions);
+        setTransactionStats(transRes.data.chartData);
       }
     } catch (error) {
       toast.error('Failed to fetch data');
@@ -359,9 +428,17 @@ const AdminDashboard: React.FC = () => {
                           outerRadius={70}
                           paddingAngle={8}
                           dataKey="value"
+                          onClick={(entry) => {
+                            setActiveTab('records');
+                            setRecordFilter(entry.name as 'On-Time' | 'Overdue');
+                            setTimeout(() => {
+                              document.getElementById('records-table')?.scrollIntoView({ behavior: 'smooth' });
+                            }, 100);
+                          }}
+                          className="cursor-pointer"
                         >
-                          <Cell fill="#60a5fa" />
-                          <Cell fill="#f87171" />
+                          <Cell fill="#60a5fa" className="hover:opacity-80 transition-opacity" />
+                          <Cell fill="#f87171" className="hover:opacity-80 transition-opacity" />
                         </Pie>
                         <Tooltip
                           contentStyle={{
@@ -432,13 +509,49 @@ const AdminDashboard: React.FC = () => {
             >
               Account Deletions
             </button>
+            <button
+              onClick={() => setActiveTab('transactions')}
+              className={cn(
+                "pb-4 text-sm font-bold transition-all border-b-2",
+                activeTab === 'transactions' ? "border-green-600 text-green-600" : "border-transparent text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Financials
+            </button>
           </div>
 
           {activeTab === 'records' ? (
-            <section className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex items-center">
-                <BookOpen className="w-5 h-5 text-blue-600 mr-2" />
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Borrowing & Reservation Records</h2>
+            <section id="records-table" className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
+                <div className="flex items-center">
+                  <BookOpen className="w-5 h-5 text-blue-600 mr-2" />
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">Borrowing & Reservation Records</h2>
+                </div>
+                <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
+                  <input
+                    type="text"
+                    placeholder="Search name or email..."
+                    value={recordSearch}
+                    onChange={(e) => setRecordSearch(e.target.value)}
+                    className="px-4 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white placeholder-gray-400"
+                  />
+                  <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-100 dark:border-gray-700">
+                    {(['All', 'On-Time', 'Overdue'] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setRecordFilter(filter)}
+                        className={cn(
+                          "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                          recordFilter === filter
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-100 dark:shadow-none"
+                            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                        )}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
@@ -452,7 +565,28 @@ const AdminDashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {borrowedRecords.map((record) => (
+                    {borrowedRecords.filter(record => {
+                      if (recordSearch) {
+                        const searchLower = recordSearch.toLowerCase();
+                        const nameMatch = record.user?.name?.toLowerCase().includes(searchLower);
+                        const emailMatch = record.user?.email?.toLowerCase().includes(searchLower);
+                        if (!nameMatch && !emailMatch) return false;
+                      }
+
+                      if (recordFilter === 'All') return true;
+                      
+                      const isOverdue = new Date() > new Date(record.dueDate) && (record.reservationStatus === 'Borrowed' || record.reservationStatus === 'PendingReturn');
+                      
+                      if (recordFilter === 'Overdue') {
+                        return isOverdue;
+                      }
+                      
+                      if (recordFilter === 'On-Time') {
+                        return !isOverdue && (record.reservationStatus === 'Borrowed' || record.reservationStatus === 'PendingReturn');
+                      }
+                      
+                      return true;
+                    }).map((record) => (
                       <tr key={record._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-bold text-gray-900 dark:text-white">{record.user.name}</div>
@@ -465,7 +599,8 @@ const AdminDashboard: React.FC = () => {
                             record.reservationStatus === 'Reserved' ? "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300" :
                               record.reservationStatus === 'Returned' ? "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300" :
                                 record.reservationStatus === 'PendingReturn' ? "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300" :
-                                  "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300"
+                                  record.reservationStatus === 'Expired' ? "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300" :
+                                    "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300"
                           )}>
                             {record.reservationStatus}
                           </span>
@@ -511,7 +646,7 @@ const AdminDashboard: React.FC = () => {
               <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <div className="flex items-center">
                   <Users className="w-5 h-5 text-blue-600 mr-2" />
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">User Management (RBAC)</h2>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">User Management </h2>
                 </div>
                 <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-100 dark:border-gray-700">
                   {(['All', 'Admin', 'User'] as const).map((role) => (
@@ -625,7 +760,7 @@ const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{b.category}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-300">
-                          {b.quantity} Left <span className="text-gray-400 text-xs">(NRP {b.price})</span>
+                          {b.quantity} Left <span className="text-gray-400 text-xs">(${b.price})</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-4">
@@ -699,6 +834,130 @@ const AdminDashboard: React.FC = () => {
                 </table>
               </div>
             </section>
+          ) : activeTab === 'transactions' ? (
+            <div className="space-y-8">
+              <section className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 p-8">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Revenue Overview</h2>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={transactionStats}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" />
+                      <XAxis dataKey="name" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                      <YAxis tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '12px', color: '#fff' }}
+                        formatter={(value) => [`$${value}`, undefined]}
+                      />
+                      <Legend />
+                      <Bar dataKey="Stripe" stackId="a" fill="#6366f1" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="Cash" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col items-center justify-center">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Total Revenue</div>
+                  <div className="text-3xl font-black text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</div>
+                </div>
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-800/30 shadow-sm flex flex-col items-center justify-center">
+                  <div className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-2">Stripe Revenue</div>
+                  <div className="text-3xl font-black text-indigo-700 dark:text-indigo-300">${totalStripe.toFixed(2)}</div>
+                </div>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-800/30 shadow-sm flex flex-col items-center justify-center">
+                  <div className="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-2">Cash Revenue</div>
+                  <div className="text-3xl font-black text-emerald-700 dark:text-emerald-300">${totalCash.toFixed(2)}</div>
+                </div>
+              </div>
+
+              <section className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
+                  <div className="flex items-center">
+                    <TrendingUp className="w-5 h-5 text-green-600 mr-2" />
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Transaction History</h2>
+                  </div>
+                  <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
+                    {transactionFilter === 'Custom' && (
+                      <div className="flex items-center space-x-2">
+                        <input 
+                          type="date" 
+                          className="px-3 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300"
+                          value={customDateRange.start}
+                          onChange={e => setCustomDateRange(prev => ({...prev, start: e.target.value}))}
+                        />
+                        <span className="text-gray-400 text-xs font-bold">to</span>
+                        <input 
+                          type="date" 
+                          className="px-3 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300"
+                          value={customDateRange.end}
+                          onChange={e => setCustomDateRange(prev => ({...prev, end: e.target.value}))}
+                        />
+                      </div>
+                    )}
+                    <select
+                      value={transactionFilter}
+                      onChange={(e: any) => setTransactionFilter(e.target.value)}
+                      className="px-4 py-2 text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="All">All Time</option>
+                      <option value="Today">Today</option>
+                      <option value="Weekly">This Week</option>
+                      <option value="Monthly">This Month</option>
+                      <option value="Annually">This Year</option>
+                      <option value="Custom">Custom Range</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
+                    <thead className="bg-gray-50 dark:bg-gray-800/50">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date & Time</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Book</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Breakdown</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Method</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filteredTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No transactions found for this period.</td>
+                        </tr>
+                      ) : filteredTransactions.map((tx) => (
+                        <tr key={tx._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white">{new Date(tx.date).toLocaleDateString()}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(tx.date).toLocaleTimeString()}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white">{tx.user.name}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{tx.user.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-medium">
+                            {tx.bookTitle}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Price: ${tx.bookPrice.toFixed(2)}</div>
+                            {tx.fineAmount > 0 && <div className="text-xs text-red-500">Fine: ${tx.fineAmount.toFixed(2)}</div>}
+                            <div className="text-sm font-black text-gray-900 dark:text-white mt-1">Total: ${tx.totalAmount.toFixed(2)}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn(
+                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest",
+                              tx.paymentMethod === 'Stripe' ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            )}>
+                              {tx.paymentMethod}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
           ) : null}
         </div>
       )}
@@ -764,7 +1023,7 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price (NRP)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price ($)</label>
                   <input
                     type="number"
                     required
@@ -922,7 +1181,7 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (NRP)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
                   <input
                     type="number"
                     required

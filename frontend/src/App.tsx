@@ -20,6 +20,7 @@ import Privacy from './pages/Privacy';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Payment from './pages/Payment';
+import PaymentSuccess from './pages/PaymentSuccess';
 import BookDetails from './pages/BookDetails';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly }) => {
@@ -79,6 +80,12 @@ const App: React.FC = () => {
                 <Route path="/payment" element={
                   <ProtectedRoute>
                     <Payment />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/payment/success" element={
+                  <ProtectedRoute>
+                    <PaymentSuccess />
                   </ProtectedRoute>
                 } />
 

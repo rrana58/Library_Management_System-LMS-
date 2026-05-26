@@ -8,12 +8,14 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { useNavigate, Link } from 'react-router-dom';
 
 interface BorrowedBook {
+  _id: string;
   book: string;
   bookTitle: string;
   borrowDate: string;
   dueDate: string;
   returned: boolean;
   fine?: number;
+  reservationStatus: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -63,19 +65,23 @@ const Dashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  const executeReturn = async (method: 'Cash' | 'Khalti') => {
+  const executeReturn = async (method: 'Cash' | 'Stripe') => {
     if (!returnModalBook) return;
     setProcessingReturn(true);
     try {
       const { data } = await api.put(`/borrow/return-borrowed-book/${returnModalBook.book}`, { email: user?.email, paymentMethod: method });
       if (data.success) {
-        if (method === 'Khalti' && data.borrow?.fine > 0) {
-           // Initiate Khalti
-           const khaltiRes = await api.post('/payment/initiate', { borrowId: data.borrow._id });
-           if (khaltiRes.data.success && khaltiRes.data.payment_url) {
-             window.location.href = khaltiRes.data.payment_url;
-             return;
-           }
+        if (method === 'Stripe') {
+           setReturnModalBook(null);
+           navigate('/payment', { 
+             state: { 
+               paymentType: 'book_return',
+               referenceId: data.borrow._id, 
+               amount: (data.borrow.price || 0) + (data.borrow.fine || 0), 
+               purposeTitle: `Book Return: "${returnModalBook.bookTitle}"`
+             } 
+           });
+           return;
         }
         toast.success(data.message);
         setReturnModalBook(null);
@@ -85,6 +91,19 @@ const Dashboard: React.FC = () => {
       toast.error(error.response?.data?.message || 'Return request failed');
     } finally {
       setProcessingReturn(false);
+    }
+  };
+
+  const handleCancelReservation = async (borrowId: string) => {
+    if (!window.confirm('Are you sure you want to cancel this reservation?')) return;
+    try {
+      const { data } = await api.put(`/borrow/unreserve/${borrowId}`);
+      if (data.success) {
+        toast.success(data.message);
+        fetchData();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to cancel reservation');
     }
   };
 
@@ -324,13 +343,17 @@ const Dashboard: React.FC = () => {
                   >
                     <div className="flex justify-between items-start mb-4">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white">{borrow.bookTitle}</h3>
-                      <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Active</span>
+                      {borrow.reservationStatus === 'Reserved' ? (
+                        <span className="bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Reserved</span>
+                      ) : (
+                        <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Active</span>
+                      )}
                     </div>
                     
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                        Borrowed: {new Date(borrow.borrowDate).toLocaleDateString()}
+                        {borrow.reservationStatus === 'Reserved' ? 'Reserved' : 'Borrowed'}: {new Date(borrow.borrowDate).toLocaleDateString()}
                       </div>
                       <div className="flex items-center text-sm font-medium text-red-600 dark:text-red-400">
                         <AlertCircle className="h-4 w-4 mr-2" />
@@ -339,18 +362,27 @@ const Dashboard: React.FC = () => {
                       {borrow.fine && borrow.fine > 0 && (
                         <div className="flex items-center text-sm font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 p-2 rounded-lg">
                           <CreditCard className="h-4 w-4 mr-2" />
-                          Fine: NRP {borrow.fine.toFixed(2)}
+                          Fine: ${borrow.fine.toFixed(2)}
                         </div>
                       )}
                     </div>
 
                     <div className="space-y-3">
-                      <button
-                        onClick={() => setReturnModalBook(borrow)}
-                        className="w-full py-2.5 bg-gray-900 dark:bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-blue-700 transition-all shadow-lg shadow-gray-200 dark:shadow-none"
-                      >
-                        Initiate Return
-                      </button>
+                      {borrow.reservationStatus === 'Reserved' ? (
+                        <button
+                          onClick={() => handleCancelReservation(borrow._id)}
+                          className="w-full py-2.5 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-200 dark:shadow-none"
+                        >
+                          Cancel Reservation
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setReturnModalBook(borrow)}
+                          className="w-full py-2.5 bg-gray-900 dark:bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-blue-700 transition-all shadow-lg shadow-gray-200 dark:shadow-none"
+                        >
+                          Initiate Return
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -419,11 +451,11 @@ const Dashboard: React.FC = () => {
             
             <div className="space-y-4">
               <button
-                onClick={() => executeReturn('Khalti')}
+                onClick={() => executeReturn('Stripe')}
                 disabled={processingReturn}
                 className="w-full py-4 bg-[#5C2D91] text-white font-bold rounded-xl hover:bg-[#4a2475] transition-all shadow-lg flex items-center justify-center disabled:opacity-50"
               >
-                {processingReturn ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Pay via Khalti'}
+                {processingReturn ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Pay Online'}
               </button>
               
               <button
