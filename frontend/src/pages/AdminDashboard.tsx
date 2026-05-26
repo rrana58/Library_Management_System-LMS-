@@ -472,7 +472,7 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Tabs */}
-          <div className="flex space-x-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex space-x-4 border-b border-gray-100 dark:border-gray-800 overflow-x-auto whitespace-nowrap scrollbar-hide">
             <button
               onClick={() => setActiveTab('records')}
               className={cn(

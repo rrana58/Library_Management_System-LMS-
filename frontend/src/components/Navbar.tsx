@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Bell, BellRing, MessageSquare, Library, Sun, Moon, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, BellRing, MessageSquare, Library, Sun, Moon, Settings as SettingsIcon, Menu, X } from 'lucide-react';
 import logo from '../assets/logo.png';
 import api from '../services/api';
 
@@ -11,6 +11,7 @@ const Navbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [hasUnread, setHasUnread] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/admin/dashboard';
@@ -116,9 +117,76 @@ const Navbar: React.FC = () => {
                 </Link>
               </div>
             )}
+            
+            {/* Mobile menu button */}
+            <div className="flex items-center sm:hidden ml-2">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              >
+                <span className="sr-only">Open main menu</span>
+                {isMobileMenuOpen ? (
+                  <X className="block h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <Menu className="block h-6 w-6" aria-hidden="true" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-lg">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            {user?.role !== 'Admin' && (
+              <>
+                <Link
+                  to="/library"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/library') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}
+                >
+                  <div className="flex items-center">
+                    <Library className="w-5 h-5 mr-3" />
+                    Library
+                  </div>
+                </Link>
+                {user && (
+                  <Link
+                    to="/chatbot"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/chatbot') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}
+                  >
+                    <div className="flex items-center">
+                      <MessageSquare className="w-5 h-5 mr-3" />
+                      Assistant
+                    </div>
+                  </Link>
+                )}
+              </>
+            )}
+            {!user && (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-md text-base font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-800"
+                >
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
