@@ -5,6 +5,7 @@ import {
     recordBorrowedBook,
     returnBorrowBook,
     reserveBook,
+    unreserveBook,
     collectReservedBook,
     getAdminStats,
     confirmBookReturn,
@@ -51,6 +52,7 @@ router.put(
 );
 
 router.post("/reserve/:id", isAuthenticated, reserveBook);
+router.put("/unreserve/:borrowId", isAuthenticated, unreserveBook);
 
 router.post(
     "/collect/:borrowId", 

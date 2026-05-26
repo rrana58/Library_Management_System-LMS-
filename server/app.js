@@ -13,6 +13,7 @@ import userRouter from "./routes/userRouter.js";
 import notificationRouter from "./routes/notificationRouter.js";
 import chatbotRouter from "./routes/chatbotRouter.js";
 import paymentRouter from "./routes/paymentRouter.js";
+import transactionRouter from "./routes/transactionRouter.js";
 
 import { notifyUsers } from "./services/notifyUsers.js";
 import {removeUnverifiedAccounts} from "./services/removeUnverifiedAccounts.js";
@@ -52,6 +53,7 @@ app.use("/api/v1/user", userRouter);
 app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/chatbot", chatbotRouter);
 app.use("/api/v1/payment", paymentRouter);
+app.use("/api/v1/transaction", transactionRouter);
 
 notifyUsers();
 removeUnverifiedAccounts();

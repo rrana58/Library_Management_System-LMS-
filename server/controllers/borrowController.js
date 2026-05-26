@@ -3,15 +3,28 @@ import { ErrorHandler } from "../middlewares/errorMiddlewares.js";
 import Book from "../models/bookModel.js";
 import Borrow from "../models/borrowModel.js";
 import User from "../models/userModel.js";
+import Transaction from "../models/transactionModel.js";
 import { calculateFine } from "../utils/fineCalculator.js";
 import { createNotification } from "./notificationController.js";
 
 
 export const borrowedBooks = catchAsyncErrors(async (req, res, next) => {
-    const { borrowedBooks } = req.user;
+    const borrows = await Borrow.find({ "user.id": req.user._id }).populate("book", "title");
+    
+    const formattedBorrows = borrows.map(borrow => ({
+        _id: borrow._id,
+        book: borrow.book ? borrow.book._id : null,
+        bookTitle: borrow.book ? borrow.book.title : "Unknown Book",
+        borrowDate: borrow.borrowDate || borrow.createdAt,
+        dueDate: borrow.dueDate,
+        returned: borrow.reservationStatus === "Returned" || borrow.reservationStatus === "Cancelled",
+        fine: borrow.fine,
+        reservationStatus: borrow.reservationStatus
+    }));
+
     res.status(200).json({
         success: true,
-        borrowedBooks,
+        borrowedBooks: formattedBorrows,
     });
 }); 
 
@@ -28,6 +41,14 @@ export const recordBorrowedBook = catchAsyncErrors(async (req, res, next) => {
 
     if (book.quantity === 0) return next(new ErrorHandler("Book not available.", 400));
 
+    const activeBooksCount = await Borrow.countDocuments({
+        "user.id": user._id,
+        reservationStatus: { $in: ["Reserved", "Borrowed", "PendingReturn"] }
+    });
+
+    if (activeBooksCount >= 5) {
+        return next(new ErrorHandler("Maximum limit reached: You can only have up to 5 active books at a time. Please return a book first.", 400));
+    }
     
     const isAlreadyBorrowed = user.borrowedBooks.find(
         (b) => b.book?.toString() === id && b.returned === false
@@ -105,14 +126,14 @@ export const returnBorrowBook = catchAsyncErrors(async (req, res, next) => {
         await borrow.save();
 
         if (fine > 0) {
-            await createNotification(user._id, `Return requested. You have a penalty fine of NRP ${fine.toFixed(2)} to be paid via ${borrow.paymentMethod}.`, "Fine");
+            await createNotification(user._id, `Return requested. You have a penalty fine of $${fine.toFixed(2)} to be paid via ${borrow.paymentMethod}.`, "Fine");
         }
 
         return res.status(200).json({
             success: true,
             borrow,
             message: fine !== 0 
-                ? `Return requested successfully. Total Fine: NRP ${fine.toFixed(2)}. Awaiting admin confirmation.` 
+                ? `Return requested successfully. Total Fine: $${fine.toFixed(2)}. Awaiting admin confirmation.` 
                 : `Return requested. Awaiting admin confirmation.`,
         });
     }
@@ -148,6 +169,24 @@ export const confirmBookReturn = catchAsyncErrors(async (req, res, next) => {
     }
 
     borrow.reservationStatus = "Returned";
+    
+    if (borrow.paymentMethod === "Cash") {
+        const bookTitle = book ? book.title : "Unknown Book";
+        const fineAmount = borrow.fine || 0;
+        const bookPrice = borrow.price || 0;
+        const totalAmount = fineAmount + bookPrice;
+
+        await Transaction.create({
+            user: borrow.user,
+            bookTitle,
+            bookPrice,
+            fineAmount,
+            totalAmount,
+            paymentMethod: "Cash",
+            paymentType: "Book Return",
+        });
+    }
+
     // If Admin confirms it, the fine has been collected/waived.
     borrow.fine = 0;
     await borrow.save();
@@ -191,6 +230,15 @@ export const reserveBook = catchAsyncErrors(async (req, res, next) => {
     if (book.quantity === 0) return next(new ErrorHandler("Book not available.", 400));
 
     const user = await User.findById(req.user._id);
+
+    const activeBooksCount = await Borrow.countDocuments({
+        "user.id": user._id,
+        reservationStatus: { $in: ["Reserved", "Borrowed", "PendingReturn"] }
+    });
+
+    if (activeBooksCount >= 5) {
+        return next(new ErrorHandler("Maximum limit reached: You can only have up to 5 active books at a time. Please return a book first.", 400));
+    }
 
     const isAlreadyBorrowed = user.borrowedBooks.find(
         (b) => b.book?.toString() === id && b.returned === false
@@ -340,3 +388,37 @@ export const getUserStats = catchAsyncErrors(async (req, res, next) => {
         }
     });
 });
+
+export const unreserveBook = catchAsyncErrors(async (req, res, next) => {
+    const { borrowId } = req.params;
+    const borrow = await Borrow.findById(borrowId);
+
+    if (!borrow) return next(new ErrorHandler("Record not found.", 404));
+
+    if (borrow.user.id.toString() !== req.user._id.toString()) {
+        return next(new ErrorHandler("Unauthorized.", 403));
+    }
+
+    if (borrow.reservationStatus !== "Reserved") {
+        return next(new ErrorHandler("Only reserved books can be unreserved.", 400));
+    }
+
+    // Update the borrow record
+    borrow.reservationStatus = "Cancelled";
+    await borrow.save();
+
+    // Restore book quantity
+    const book = await Book.findById(borrow.book);
+    if (book) {
+        book.quantity += 1;
+        book.availability = true;
+        await book.save();
+    }
+
+    await createNotification(req.user._id, `You have successfully cancelled the reservation for "${book ? book.title : 'the book'}".`, "Reservation");
+
+    res.status(200).json({
+        success: true,
+        message: "Reservation cancelled successfully.",
+    });
+});

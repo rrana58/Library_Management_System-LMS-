@@ -3,8 +3,8 @@ import Borrow from "../models/borrowModel.js";
 import Book from "../models/bookModel.js";
 
 export const cleanupReservations = () => {
-    // Runs every hour
-    cron.schedule("0 * * * *", async () => {
+    // Runs every 5 minutes
+    cron.schedule("*/5 * * * *", async () => {
         try {
             const expiredReservations = await Borrow.find({
                 reservationStatus: "Reserved",
@@ -22,6 +22,18 @@ export const cleanupReservations = () => {
                     book.quantity += 1;
                     book.availability = true;
                     await book.save();
+                }
+
+                // Notify user
+                try {
+                    const Notification = (await import("../models/notificationModel.js")).default;
+                    await Notification.create({
+                        user: reservation.user.id,
+                        message: `Your reservation for a book has expired as it was not collected within 24 hours.`,
+                        type: "Reservation"
+                    });
+                } catch (err) {
+                    console.error("Error creating expiry notification", err);
                 }
             }
 
