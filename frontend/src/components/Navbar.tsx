@@ -62,7 +62,7 @@ const Navbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={toggleTheme}
               className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
@@ -90,9 +90,9 @@ const Navbar: React.FC = () => {
                 
                 <div className="h-8 w-px bg-gray-200 dark:bg-gray-800 mx-2"></div>
                 
-                <Link to={dashboardPath} className={`flex items-center space-x-3 text-sm font-medium transition-colors p-1.5 rounded-full border ${isDashboard ? 'border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                  <div className="flex flex-col text-right pl-2">
-                    <span className="text-gray-900 dark:text-white font-bold leading-tight">{user.name}</span>
+                <Link to={dashboardPath} className={`flex items-center space-x-2 sm:space-x-3 text-sm font-medium transition-colors p-1.5 rounded-full border ${isDashboard ? 'border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                  <div className="hidden sm:flex flex-col text-right pl-2">
+                    <span className="text-gray-900 dark:text-white font-bold leading-tight truncate max-w-[120px]">{user.name}</span>
                     <span className="text-[10px] uppercase font-black text-blue-600 dark:text-blue-400 tracking-wider font-mono">{user.role}</span>
                   </div>
                   {user.avatar?.url ? (

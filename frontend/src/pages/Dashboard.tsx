@@ -260,10 +260,10 @@ const Dashboard: React.FC = () => {
                         }} 
                       />
                       <Legend 
-                        verticalAlign="middle" 
-                        align="right" 
-                        layout="vertical"
-                        wrapperStyle={{ paddingLeft: '20px' }}
+                        verticalAlign="bottom" 
+                        align="center" 
+                        layout="horizontal"
+                        wrapperStyle={{ paddingTop: '20px' }}
                       />
                       </PieChart>
                     </ResponsiveContainer>
